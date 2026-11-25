@@ -4,9 +4,10 @@ namespace App\Models;
 
 use App\Interfaces\Reservable;
 
+// DVD implementa Reservable: es pot reservar igual que Llibre.
 class DVD extends Material implements Reservable
 {
-    private int $duracio; // en minutos
+    private int $duracio; // en minuts
     private ?string $usuariReserva = null;
 
     public function __construct(
@@ -16,17 +17,20 @@ class DVD extends Material implements Reservable
         int $anyPublicacio,
         int $duracio
     ) {
-        // TODO: parent::__construct(...) + setDuracio($duracio)
+        parent::__construct($id, $titol, $autor, $anyPublicacio);
+        $this->setDuracio($duracio);
     }
 
+    // Calcula la multa segons la tarifa de DVD: 1.00 per dia de retard.
     public function calcularMulta(int $diesRetard): float
     {
-        // TODO: 1.00 € por día de retraso
+        return $diesRetard * 1.00;
     }
 
+    // Retorna el tipus exacte d'aquest material.
     public function getTipus(): string
     {
-        // TODO: devuelve exactamente "DVD"
+        return "DVD";
     }
 
     public function getDuracio(): int
@@ -34,32 +38,50 @@ class DVD extends Material implements Reservable
         return $this->duracio;
     }
 
+    // Assigna la durada validant que sigui mes gran que 0.
     public function setDuracio(int $minuts): void
     {
-        // TODO: validación > 0
+        if ($minuts > 0) {
+            $this->duracio = $minuts;
+        } else {
+            throw new \InvalidArgumentException("La durada ha de ser mes gran que 0");
+        }
     }
 
+    // Formata la durada en hores i minuts, ex: 150 -> "2h 30min".
     public function getDuracioFormatada(): string
     {
-        // TODO: 150 minutos -> "2h 30min" ; 45 minutos -> "0h 45min"
-        // Pista: intdiv($this->duracio, 60) y $this->duracio % 60
+        $hores = intdiv($this->duracio, 60);
+        $minuts = $this->duracio % 60;
+        return "{$hores}h {$minuts}min";
     }
 
-    // --- Reservable: misma lógica que en Llibre (puedes copiarla y adaptar) ---
-
+    // Reserva el material si no estava ja reservat per ningu.
     public function reservar(string $nomUsuari): bool
     {
-        // TODO
+        if ($this->usuariReserva !== null) {
+            return false;
+        }
+        $this->usuariReserva = $nomUsuari;
+        $this->registrarAccio("reservat");
+        return true;
     }
 
+    // Cancel·la la reserva actual, si n'hi ha alguna.
     public function cancelarReserva(): bool
     {
-        // TODO
+        if ($this->usuariReserva === null) {
+            return false;
+        }
+        $this->usuariReserva = null;
+        $this->registrarAccio("reserva_cancel·lada");
+        return true;
     }
 
+    // Comprova si el material te una reserva activa.
     public function estaReservat(): bool
     {
-        // TODO
+        return $this->usuariReserva !== null;
     }
 
     public function getUsuariReserva(): ?string

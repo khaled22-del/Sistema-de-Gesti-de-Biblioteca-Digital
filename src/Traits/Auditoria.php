@@ -3,18 +3,21 @@
 namespace App\Traits;
 
 /**
- * Trait reutilizable: lleva un historial de acciones ('prestat', 'retornat',
- * 'reservat', 'reserva_cancel·lada'). Lo usan todos los Material.
+ * Trait reutilitzable: porta un historial d'accions ('prestat', 'retornat',
+ * 'reservat', 'reserva_cancel·lada'). L'utilitzen tots els Material.
  */
 trait Auditoria
 {
     private array $historial = [];
 
+    // Afegeix una entrada nova a l'historial amb la data actual.
     public function registrarAccio(string $accio, string $detalls = ''): void
     {
-        // TODO: añade una entrada a $historial con el formato:
-        // ['data' => 'Y-m-d H:i:s', 'accio' => ..., 'detalls' => ...]
-        // Pista: date('Y-m-d H:i:s') te da la fecha/hora actual formateada.
+        $this->historial[] = [
+            'data' => date('Y-m-d H:i:s'),
+            'accio' => $accio,
+            'detalls' => $detalls,
+        ];
     }
 
     public function obtenirHistorial(): array
@@ -22,11 +25,13 @@ trait Auditoria
         return $this->historial;
     }
 
+    // Retorna la darrera entrada de l'historial, o null si esta buit.
     public function obtenirUltimaAccio(): ?array
     {
-        // TODO: devuelve la última entrada del historial, o null si está vacío.
-        // Pista: end($this->historial) mueve el puntero al final y te devuelve ese elemento
-        // (o false si el array está vacío).
+        if (empty($this->historial)) {
+            return null;
+        }
+        return end($this->historial);
     }
 
     public function netejarHistorial(): void

@@ -4,6 +4,9 @@ namespace App\Models;
 
 use App\Traits\Auditoria;
 
+/**
+ * Representa qualsevol material de la biblioteca (Llibre, Revista, DVD).
+ */
 abstract class Material
 {
     use Auditoria;
@@ -18,36 +21,37 @@ abstract class Material
     ) {
     }
 
-    // --- Métodos abstractos: cada subclase (Llibre/Revista/DVD) decide cómo ---
+    // Cada subclasse calcula la seva propia tarifa de multa per dia de retard.
     abstract public function calcularMulta(int $diesRetard): float;
 
+    // Cada subclasse retorna el seu propi nom exacte ("Llibre", "Revista", "DVD").
     abstract public function getTipus(): string;
 
-    // --- Métodos concretos: AQUÍ VA TU LÓGICA ---
-
+    // Marca el material com a prestat si estava disponible; si no, retorna false.
     public function prestar(): bool
     {
-        // TODO:
-        // - si $disponible es true: ponlo a false, registra la acción "prestat"
-        //   (usa $this->registrarAccio(...) del trait Auditoria) y devuelve true.
-        // - si ya no está disponible: devuelve false sin tocar nada.
+        if ($this->disponible) {
+            $this->disponible = false;
+            $this->registrarAccio("prestat");
+            return true;
+        }
+        return false;
     }
 
+    // Marca el material com a disponible de nou i ho registra a l'historial.
     public function retornar(): void
     {
-        // TODO: marca el material como disponible otra vez
-        // y registra la acción "retornat".
+        $this->disponible = true;
+        $this->registrarAccio("retornat");
     }
 
+    // Retorna el material en el format de text exigit per l'enunciat.
     public function __toString(): string
     {
-        // TODO: debe devolver EXACTAMENTE este formato (mira el enunciado):
-        // [Llibre] #1 - El nom de la rosa (Umberto Eco, 1980) - Disponible
-        // usa getTipus() para "Llibre"/"Revista"/"DVD", y "Disponible"/"No disponible"
-        // según el valor de $disponible.
+        $estat = $this->disponible ? "Disponible" : "No disponible";
+        return "[{$this->getTipus()}] #{$this->id} - {$this->titol} ({$this->autor}, {$this->anyPublicacio}) - {$estat}";
     }
 
-    // --- Getters (triviales, ya los tienes) ---
     public function getId(): int
     {
         return $this->id;

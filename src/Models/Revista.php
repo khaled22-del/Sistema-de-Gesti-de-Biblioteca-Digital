@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-// Ojo: Revista NO implementa Reservable (las revistas no se pueden reservar).
+// Revista no implementa Reservable: les revistes no es poden reservar.
 class Revista extends Material
 {
     private int $numeroEdicio;
@@ -14,18 +14,20 @@ class Revista extends Material
         int $anyPublicacio,
         int $numeroEdicio
     ) {
-        // TODO: llama a parent::__construct(...) con los 4 campos de Material
-        // y asigna $numeroEdicio (usa el setter, igual que hace Llibre).
+        parent::__construct($id, $titol, $autor, $anyPublicacio);
+        $this->setNumeroEdicio($numeroEdicio);
     }
 
+    // Calcula la multa segons la tarifa de revista: 0.25 per dia de retard.
     public function calcularMulta(int $diesRetard): float
     {
-        // TODO: 0.25 € por día de retraso
+        return $diesRetard * 0.25;
     }
 
+    // Retorna el tipus exacte d'aquest material.
     public function getTipus(): string
     {
-        // TODO: devuelve exactamente "Revista"
+        return "Revista";
     }
 
     public function getNumeroEdicio(): int
@@ -33,8 +35,13 @@ class Revista extends Material
         return $this->numeroEdicio;
     }
 
+    // Assigna el numero d'edicio validant que sigui mes gran que 0.
     public function setNumeroEdicio(int $numero): void
     {
-        // TODO: validación > 0, igual que en Llibre
+        if ($numero > 0) {
+            $this->numeroEdicio = $numero;
+        } else {
+            throw new \InvalidArgumentException("El numero ha de ser mes gran que 0");
+        }
     }
 }

@@ -4,12 +4,12 @@ namespace App\Models;
 
 use App\Interfaces\Reservable;
 
+// Llibre implementa Reservable: es pot reservar.
 class Llibre extends Material implements Reservable
 {
     private int $numeroPagines;
     private ?string $usuariReserva = null;
 
-    // Constructor: tal cual lo da el enunciado (parent:: + setter con validación)
     public function __construct(
         int $id,
         string $titol,
@@ -18,17 +18,19 @@ class Llibre extends Material implements Reservable
         int $numeroPagines
     ) {
         parent::__construct($id, $titol, $autor, $anyPublicacio);
-        $this->setNumeroPagines($numeroPagines); // el setter también valida
+        $this->setNumeroPagines($numeroPagines);
     }
 
+    // Calcula la multa segons la tarifa de llibre: 0.50 per dia de retard.
     public function calcularMulta(int $diesRetard): float
     {
-        // TODO: 0.50 € por día de retraso
+        return $diesRetard * 0.50;
     }
 
+    // Retorna el tipus exacte d'aquest material.
     public function getTipus(): string
     {
-        // TODO: devuelve exactamente "Llibre"
+        return "Llibre";
     }
 
     public function getNumeroPagines(): int
@@ -36,29 +38,42 @@ class Llibre extends Material implements Reservable
         return $this->numeroPagines;
     }
 
+    // Assigna el numero de pagines validant que sigui mes gran que 0.
     public function setNumeroPagines(int $pagines): void
     {
-        // TODO: si $pagines no es > 0, lanza \InvalidArgumentException
-        // si es válido, asígnalo a $this->numeroPagines
+        if ($pagines > 0) {
+            $this->numeroPagines = $pagines;
+        } else {
+            throw new \InvalidArgumentException("El numero de pagines ha de ser mes gran que 0");
+        }
     }
 
-    // --- Reservable: implementa aquí los 4 métodos de la interfaz ---
-
+    // Reserva el material si no estava ja reservat per ningu.
     public function reservar(string $nomUsuari): bool
     {
-        // TODO: si ya está reservado, devuelve false.
-        // si no, guarda $nomUsuari en $usuariReserva, registra "reservat" y devuelve true.
+        if ($this->usuariReserva !== null) {
+            return false;
+        }
+        $this->usuariReserva = $nomUsuari;
+        $this->registrarAccio("reservat");
+        return true;
     }
 
+    // Cancel·la la reserva actual, si n'hi ha alguna.
     public function cancelarReserva(): bool
     {
-        // TODO: si no hay reserva, devuelve false.
-        // si hay, ponla a null, registra "reserva_cancel·lada" y devuelve true.
+        if ($this->usuariReserva === null) {
+            return false;
+        }
+        $this->usuariReserva = null;
+        $this->registrarAccio("reserva_cancel·lada");
+        return true;
     }
 
+    // Comprova si el material te una reserva activa.
     public function estaReservat(): bool
     {
-        // TODO
+        return $this->usuariReserva !== null;
     }
 
     public function getUsuariReserva(): ?string
