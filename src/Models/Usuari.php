@@ -2,64 +2,85 @@
 
 namespace App\Models;
 
+use App\Exceptions\EmailInvalidException;
+
+// Representa un usuari de la biblioteca, amb els seus prestecs i notificacions.
 class Usuari
 {
     private int $id;
     private string $nom;
     private string $email;
-    private array $materialsPrestats = []; // objetos Material
+    private array $materialsPrestats = [];
     private \DateTime $dataRegistre;
     private array $notificacions = [];
 
     public function __construct(int $id, string $nom, string $email)
     {
-        // TODO:
-        // - valida el email con validarEmail(); si no es válido, lanza
-        //   \App\Exceptions\EmailInvalidException (recuerda importarla con use)
-        // - asigna $id, $nom, $email
-        // - inicializa $dataRegistre con la fecha actual (new \DateTime())
+        if (!$this->validarEmail($email)) {
+            throw new EmailInvalidException("Email no valid");
+        }
+        $this->id = $id;
+        $this->nom = $nom;
+        $this->email = $email;
+        $this->dataRegistre = new \DateTime();
     }
 
-    // --- Métodos mágicos obligatorios ---
-
+    // Permet llegir id, nom, email i dataRegistre des de fora; la resta, null.
     public function __get(string $propietat): mixed
     {
-        // TODO: permite leer id, nom, email, dataRegistre. Para cualquier otra, devuelve null.
-        // Pista: un match o un switch sobre $propietat.
+        return match ($propietat) {
+            'id' => $this->id,
+            'nom' => $this->nom,
+            'email' => $this->email,
+            'dataRegistre' => $this->dataRegistre,
+            default => null,
+        };
     }
 
+    // Nomes permet modificar l'email, validant-lo abans d'assignar-lo.
     public function __set(string $propietat, mixed $valor): void
     {
-        // TODO: solo permite modificar 'email' (con validación).
-        // Para cualquier otra propiedad, lanza \LogicException.
+        if ($propietat === 'email') {
+            if (!$this->validarEmail($valor)) {
+                throw new EmailInvalidException("Email no valid");
+            }
+            $this->email = $valor;
+        } else {
+            throw new \LogicException("No es pot modificar la propietat {$propietat}");
+        }
     }
 
+    // Indica quines propietats es serialitzen (totes menys notificacions).
     public function __sleep(): array
     {
-        // TODO: devuelve el array de nombres de propiedades a serializar,
-        // EXCEPTO 'notificacions'. Ej: ['id', 'nom', 'email', ...]
+        return ['id', 'nom', 'email', 'dataRegistre', 'materialsPrestats'];
     }
 
+    // Reinicialitza les notificacions en deserialitzar l'objecte.
     public function __wakeup(): void
     {
-        // TODO: reinicializa $notificacions como array vacío
+        $this->notificacions = [];
     }
 
+    // Retorna el format de text exigit per l'enunciat.
     public function __toString(): string
     {
-        // TODO: formato exacto -> Anna Puig <anna@mail.com> - 2 préstecs
+        return "{$this->nom} <{$this->email}> - {$this->getNumeroMaterialsPrestats()} prestecs";
     }
 
-    // --- Gestión de préstamos y notificaciones ---
-
+    // Afegeix un material a la llista de prestecs d'aquest usuari.
     public function afegirPrestec(Material $material): void
     {
-        // TODO: añade $material a $materialsPrestats
+        $this->materialsPrestats[] = $material;
     }
 
+    // Treu de la llista el material que tingui aquest id.
     public function eliminarPrestec(int $materialId): void
     {
-        // TODO: quita de $materialsPrestats el material cuyo getId() == $materialId
+        $this->materialsPrestats = array_filter(
+            $this->materialsPrestats,
+            fn($m) => $m->getId() !== $materialId
+        );
     }
 
     public function getMaterialsPrestats(): array
@@ -77,13 +98,17 @@ class Usuari
         $this->notificacions[] = $missatge;
     }
 
+    // Retorna les notificacions pendents i les buida despres.
     public function obtenirNotificacions(): array
     {
-        // TODO: devuelve $notificacions Y LAS VACÍA después (dos pasos)
+        $obtenir = $this->notificacions;
+        $this->notificacions = [];
+        return $obtenir;
     }
 
+    // Comprova que l'email tingui un format valid.
     private function validarEmail(string $email): bool
     {
-        // TODO: usa filter_var($email, FILTER_VALIDATE_EMAIL) !== false
+        return filter_var($email, FILTER_VALIDATE_EMAIL) !== false;
     }
 }
