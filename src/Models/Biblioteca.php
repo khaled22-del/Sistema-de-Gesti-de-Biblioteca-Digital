@@ -8,139 +8,202 @@ use App\Exceptions\MaterialNoDisponibleException;
 use App\Exceptions\MaterialNoPrestatException;
 use App\Exceptions\UsuariNoTrobatException;
 
+// Classe central: gestiona materials, usuaris, prestecs i reserves.
 class Biblioteca
 {
-    private array $materials = []; // indexado por id del material
-    private array $usuaris = [];   // indexado por id del usuario
-    private array $prestecs = [];  // todos los Prestec (activos y retornados)
+    private array $materials = [];
+    private array $usuaris = [];
+    private array $prestecs = [];
 
     public function __construct(private string $nom)
     {
     }
 
-    // --- Gestión de materiales ---
-
     public function afegirMaterial(Material $material): void
     {
-        // TODO: guárdalo en $materials indexado por su id
+        $this->materials[$material->getId()] = $material;
     }
 
+    // Elimina el material amb aquest id; retorna false si no existia.
     public function eliminarMaterial(int $id): bool
     {
-        // TODO: devuelve false si no existe
+        if (!isset($this->materials[$id])) {
+            return false;
+        }
+        unset($this->materials[$id]);
+        return true;
     }
 
     public function cercarPerId(int $id): ?Material
     {
-        // TODO
+        return $this->materials[$id] ?? null;
     }
 
     public function cercarPerTitol(string $titol): array
     {
-        // TODO: materiales cuyo título contiene el texto (sin distinguir mayúsculas)
-        // Pista: stripos() o mb_stripos()
+        return array_filter($this->materials, fn($m) => stripos($m->getTitol(), $titol) !== false);
     }
 
     public function cercarPerAutor(string $autor): array
     {
-        // TODO: igual que cercarPerTitol pero por autor
+        return array_filter($this->materials, fn($m) => stripos($m->getAutor(), $autor) !== false);
     }
-
-    // --- Listados ---
 
     public function llistarDisponibles(): array
     {
-        // TODO: array_filter sobre $materials por isDisponible()
+        return array_filter($this->materials, fn($m) => $m->isDisponible());
     }
 
     public function llistarPrestats(): array
     {
-        // TODO
+        return array_filter($this->materials, fn($m) => !$m->isDisponible());
     }
 
     public function llistarPerTipus(string $tipus): array
     {
-        // TODO: "Llibre", "Revista" o "DVD" -- filtra por getTipus()
+        return array_filter($this->materials, fn($m) => $m->getTipus() === $tipus);
     }
 
+    // Prestecs sense data de retorn (encara en curs).
     public function llistarPrestecsActius(): array
     {
-        // TODO: préstamos sin fecha de retorno (estaActiu())
+        return array_filter($this->prestecs, fn($p) => $p->estaActiu());
     }
 
+    // Materials reservats: nomes els que implementen Reservable i tenen reserva activa.
     public function llistarReserves(): array
     {
-        // TODO: materiales reservados -- usa instanceof Reservable y estaReservat()
+        return array_filter(
+            $this->materials,
+            fn($m) => $m instanceof Reservable && $m->estaReservat()
+        );
     }
 
+    // Tots els prestecs (actius i retornats) d'un usuari concret.
     public function llistarPrestecsUsuari(int $usuariId): array
     {
-        // TODO: todos los Prestec de ese usuario (activos y retornados)
+        return array_filter(
+            $this->prestecs,
+            fn($p) => $p->getUsuari()->id === $usuariId
+        );
     }
-
-    // --- Gestión de usuarios ---
 
     public function afegirUsuari(Usuari $usuari): void
     {
-        // TODO
+        $this->usuaris[$usuari->id] = $usuari;
     }
 
+    // Union type: si l'identificador es un int, cerca per id; si es un string, per nom.
     public function cercarUsuari(int|string $identificador): ?Usuari
     {
-        // TODO: si es int, busca por id. Si es string, busca por nombre.
-        // Pista: is_int($identificador) para distinguir
+        if (is_int($identificador)) {
+            return $this->usuaris[$identificador] ?? null;
+        }
+        foreach ($this->usuaris as $usuari) {
+            if ($usuari->nom === $identificador) {
+                return $usuari;
+            }
+        }
+        return null;
     }
 
-    // --- Gestión de préstamos y reservas ---
-
+    // Crea un prestec, comprovant material i usuari, i que estigui disponible.
     public function prestarMaterial(int $materialId, int $usuariId, ?\DateTime $dataPrestec = null): Prestec
     {
-        // TODO:
-        // 1. busca el material; si no existe -> throw MaterialNoTrobatException
-        // 2. busca el usuario; si no existe -> throw UsuariNoTrobatException
-        // 3. si el material ya está prestado, o reservado por OTRO usuario -> throw MaterialNoDisponibleException
-        //    (si está reservado por el MISMO usuario: se presta y se cancela la reserva)
-        // 4. crea el Prestec, guárdalo en $prestecs, añádelo al usuario (afegirPrestec)
-        //    y marca el material como prestado (prestar())
-        // 5. devuelve el Prestec creado
+        $material = $this->cercarPerId($materialId);
+        if ($material === null) {
+            throw new MaterialNoTrobatException("No existeix cap material amb ID {$materialId}");
+        }
+
+        $usuari = $this->cercarUsuari($usuariId);
+        if ($usuari === null) {
+            throw new UsuariNoTrobatException("No existeix cap usuari amb ID {$usuariId}");
+        }
+
+        if ($material instanceof Reservable && $material->estaReservat()) {
+            if ($material->getUsuariReserva() !== $usuari->nom) {
+                throw new MaterialNoDisponibleException($materialId, "Material reservat per un altre usuari");
+            }
+            $material->cancelarReserva();
+        } elseif (!$material->isDisponible()) {
+            throw new MaterialNoDisponibleException($materialId, "Material ja prestat");
+        }
+
+        $material->prestar();
+        $prestec = new Prestec($material, $usuari, 14, $dataPrestec);
+        $this->prestecs[] = $prestec;
+        $usuari->afegirPrestec($material);
+
+        return $prestec;
     }
 
+    // Tanca el prestec actiu d'aquest material i retorna l'import de la multa.
     public function retornarMaterial(int $materialId): float
     {
-        // TODO:
-        // - busca el préstamo activo de ese material; si no estaba prestado -> throw MaterialNoPrestatException
-        // - ciérralo (retornar() del Prestec), calcula la multa, marca el material disponible (retornar())
-        // - devuelve el importe de la multa (0 si no hay)
+        foreach ($this->prestecs as $prestec) {
+            if ($prestec->getMaterial()->getId() === $materialId && $prestec->estaActiu()) {
+                $multa = $prestec->calcularMulta();
+                $prestec->retornar();
+                $prestec->getMaterial()->retornar();
+                return $multa;
+            }
+        }
+        throw new MaterialNoPrestatException("El material amb ID {$materialId} no estava prestat");
     }
 
     public function reservarMaterial(int $materialId, int $usuariId): bool
     {
-        // TODO:
-        // - busca el material; si no implementa Reservable -> throw MaterialNoDisponibleException
-        //   con el mensaje "Les revistes no es poden reservar"
-        // - si lo implementa, llama a su reservar($nomUsuari) y devuelve el resultado
+        $material = $this->cercarPerId($materialId);
+        if ($material === null) {
+            throw new MaterialNoTrobatException("No existeix cap material amb ID {$materialId}");
+        }
+        if (!($material instanceof Reservable)) {
+            throw new MaterialNoDisponibleException($materialId, "Les revistes no es poden reservar");
+        }
+
+        $usuari = $this->cercarUsuari($usuariId);
+        if ($usuari === null) {
+            throw new UsuariNoTrobatException("No existeix cap usuari amb ID {$usuariId}");
+        }
+
+        return $material->reservar($usuari->nom);
     }
 
-    // --- Método mágico __call ---
-
+    // Permet getLlibres/getRevistes/getDVDs/getMaterials/getUsuaris/getNom
+    // sense tenir-los definits com a metodes reals; la resta, excepcio.
     public function __call(string $name, array $arguments): mixed
     {
-        // TODO: debe permitir estas llamadas sin tener los métodos definidos:
-        // - getLlibres() / getRevistes() / getDVDs()  -> filtran $materials por tipo
-        // - getMaterials() / getUsuaris() / getNom()  -> devuelven las propiedades directamente
-        // - cualquier otro método inexistente -> throw \BadMethodCallException
-        // Pista: un match($name) { 'getLlibres' => ..., 'getRevistes' => ..., default => ... }
+        return match ($name) {
+            'getLlibres' => $this->llistarPerTipus('Llibre'),
+            'getRevistes' => $this->llistarPerTipus('Revista'),
+            'getDVDs' => $this->llistarPerTipus('DVD'),
+            'getMaterials' => $this->materials,
+            'getUsuaris' => $this->usuaris,
+            'getNom' => $this->nom,
+            default => throw new \BadMethodCallException("Metode {$name} no existeix a Biblioteca"),
+        };
     }
-
-    // --- Estadísticas ---
 
     public function obtenirEstadistiques(): array
     {
-        // TODO: devuelve un array con esta estructura (mira el enunciado para el ejemplo):
-        // [
-        //   'total' => ..., 'disponibles' => ..., 'prestats' => ..., 'reservats' => ...,
-        //   'perTipus' => ['Llibre' => N, 'Revista' => N, 'DVD' => N],
-        //   'multesPendents' => ...   (suma de multas de préstamos vencidos activos)
-        // ]
+        $multesPendents = 0.0;
+        foreach ($this->llistarPrestecsActius() as $prestec) {
+            if ($prestec->estaVencut()) {
+                $multesPendents += $prestec->calcularMulta();
+            }
+        }
+
+        return [
+            'total' => count($this->materials),
+            'disponibles' => count($this->llistarDisponibles()),
+            'prestats' => count($this->llistarPrestats()),
+            'reservats' => count($this->llistarReserves()),
+            'perTipus' => [
+                'Llibre' => count($this->llistarPerTipus('Llibre')),
+                'Revista' => count($this->llistarPerTipus('Revista')),
+                'DVD' => count($this->llistarPerTipus('DVD')),
+            ],
+            'multesPendents' => $multesPendents,
+        ];
     }
 }
